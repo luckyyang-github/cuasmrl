@@ -1,0 +1,7 @@
+[
+  {"shape": [128, 128], "init": "zeros"},
+  {"shape": [128, 128], "init": "rand"},
+  {"shape": [128, 128], "init": "rand"},
+  {"value": 128}
+]
+
