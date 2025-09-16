@@ -79,7 +79,7 @@ def get_mutatable_ops(cc):
 
 
 def get_st_database(cc):
-    if cc == (8, 0):
+    if cc == (8, 0) or cc == (8, 6):
         return {
             # 'IADD3': 9,
             # 'IADD3.X': 5,

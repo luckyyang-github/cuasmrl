@@ -24,24 +24,34 @@ logger = get_logger(__name__)
 class CategoricalMasked(Categorical):
 
     def __init__(self, probs=None, logits=None, validate_args=None, masks=[]):
-        self.device = torch.device("cpu")  # XXX hardcore for now
+        # 使掩码与 logits/probs 保持同一设备，避免 CPU/CUDA 混用
+        if logits is not None:
+            dev = logits.device
+        elif probs is not None:
+            dev = probs.device
+        else:
+            dev = torch.device("cpu")
+        self.device = dev
+
         self.masks = masks
         if len(self.masks) == 0:
-            super(CategoricalMasked, self).__init__(probs, logits,
-                                                    validate_args)
+            super(CategoricalMasked, self).__init__(probs, logits, validate_args)
         else:
-            self.masks = masks.type(torch.BoolTensor).to(self.device)
-            logits = torch.where(self.masks, logits,
-                                 torch.tensor(-1e8).to(self.device))
-            super(CategoricalMasked, self).__init__(probs, logits,
-                                                    validate_args)
+            self.masks = masks.to(dtype=torch.bool, device=self.device)
+            neg_inf = torch.tensor(
+                -1e8,
+                dtype=(logits.dtype if logits is not None else torch.float32),
+                device=self.device,
+            )
+            logits = torch.where(self.masks, logits, neg_inf)
+            super(CategoricalMasked, self).__init__(probs, logits, validate_args)
 
     def entropy(self):
         if len(self.masks) == 0:
             return super(CategoricalMasked, self).entropy()
         p_log_p = self.logits * self.probs
-        p_log_p = torch.where(self.masks, p_log_p,
-                              torch.tensor(0.0).to(self.device))
+        zero = torch.tensor(0.0, dtype=p_log_p.dtype, device=self.device)
+        p_log_p = torch.where(self.masks, p_log_p, zero)
         return -p_log_p.sum(-1)
 
 

@@ -5,6 +5,7 @@ import os
 import sys
 import tempfile
 import time
+import subprocess
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -176,6 +177,7 @@ class DRLConfig:
     default_out_path: str = "runs"
     save_dir: str = "exp"
     log: int = 1
+    ckpt_freq: int = 100
 
     # Driver flags
     train: int = 1
@@ -212,6 +214,9 @@ def main():
     parser = argparse.ArgumentParser(
         description="Run RL scheduling search starting from your SASS/cubin and output optimized SASS and speedup."
     )
+    parser.add_argument("--child",
+                        action="store_true",
+                        help="Internal flag: run training in a child process")
     src = parser.add_mutually_exclusive_group(required=True)
     src.add_argument("--sass", type=str, help="Path to input SASS (.cuasm) file")
     src.add_argument("--cubin", type=str, help="Path to input cubin file")
@@ -272,8 +277,39 @@ def main():
                         default=None,
                         help="Path to write optimized SASS (.cuasm); default within save-dir")
 
+    parser.add_argument("--ckpt-freq",
+                        type=int,
+                        default=100,
+                        help="Checkpoint save frequency (iterations)")
+
     args = parser.parse_args()
 
+    # Parent orchestrator: spawn child, restart on exit code 1 (segfault)
+    if not args.child:
+        script_path = os.path.abspath(__file__)
+        base_argv = [a for a in sys.argv[1:] if a != "--child"]
+        cmd = [sys.executable, script_path] + base_argv + ["--child"]
+        max_retries = 5
+        attempt = 0
+        while True:
+            print(f"[INFO] Spawning RL child process (attempt {attempt + 1})...")
+            code = subprocess.call(cmd)
+            if code == 0:
+                print("[INFO] RL completed successfully.")
+                sys.exit(0)
+            if code == 1:
+                attempt += 1
+                print("[WARN] Child exited with code 1 (segfault/relaunch).")
+                if attempt >= max_retries:
+                    print("[ERROR] Exceeded max retries. Giving up.")
+                    sys.exit(1)
+                # loop to relaunch; env will resume from latest ckpt
+                continue
+            # Other non-zero: propagate
+            print(f"[ERROR] Child exited with code {code}. Aborting.")
+            sys.exit(code)
+
+    # Child path: run training in this process
     ensure_triton_on_path()
 
     # Late imports after path setup
@@ -343,6 +379,7 @@ def main():
         num_steps=args.num_steps,
         num_iterations=args.num_iter,
         total_flops=args.total_flops,
+        ckpt_freq=args.ckpt_freq,
     )
 
     # Build kernel wrapper and run RL

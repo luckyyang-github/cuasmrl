@@ -521,27 +521,12 @@ class MutationEngine:
             cubin = cap.dump_cubin()
             self.update_cubin(cubin)
         except Exception as e:
-            print(f'Assemble failed: {e}')
+            logger.exception(f'Assemble failed: {e}')
             assemble_ok = False
 
-        # BENCH
-        fn = lambda: self.bin.c_wrapper(
-            self.grid_0,
-            self.grid_1,
-            self.grid_2,
-            self.bin.num_warps,
-            self.bin.num_ctas,
-            self.bin.clusterDims[0],
-            self.bin.clusterDims[1],
-            self.bin.clusterDims[2],
-            self.bin.shared,
-            self.stream,
-            self.bin.cu_function,
-            self.launch_enter_hook,
-            self.launch_exit_hook,
-            self.bin,
-            *self.bin.assemble_tensormap_to_arg(self.non_constexpr_arg_values),
-        )
+        # BENCH（使用 runner，自动选择默认 CUDA stream）
+        _runner = self.bin[(self.grid_0, self.grid_1, self.grid_2)]
+        fn = lambda: _runner(*self.non_constexpr_arg_values)
         if assemble_ok:
             try:
                 ms = triton.testing.do_bench(fn, warmup=100, rep=100)
@@ -584,24 +569,9 @@ class MutationEngine:
             assemble_ok = False
             cubin = None
 
-        # BENCH
-        fn = lambda: self.bin.c_wrapper(
-            self.grid_0,
-            self.grid_1,
-            self.grid_2,
-            self.bin.num_warps,
-            self.bin.num_ctas,
-            self.bin.clusterDims[0],
-            self.bin.clusterDims[1],
-            self.bin.clusterDims[2],
-            self.bin.shared,
-            self.stream,
-            self.bin.cu_function,
-            self.launch_enter_hook,
-            self.launch_exit_hook,
-            self.bin,
-            *self.bin.assemble_tensormap_to_arg(self.non_constexpr_arg_values),
-        )
+        # BENCH（使用 runner，自动选择默认 CUDA stream）
+        _runner = self.bin[(self.grid_0, self.grid_1, self.grid_2)]
+        fn = lambda: _runner(*self.non_constexpr_arg_values)
         if assemble_ok:
             try:
                 ms = triton.testing.do_bench(fn, warmup=100, rep=100)
@@ -642,24 +612,9 @@ class MutationEngine:
             assemble_ok = False
             raise e
 
-        # final BENCH
-        fn = lambda: self.bin.c_wrapper(
-            self.grid_0,
-            self.grid_1,
-            self.grid_2,
-            self.bin.num_warps,
-            self.bin.num_ctas,
-            self.bin.clusterDims[0],
-            self.bin.clusterDims[1],
-            self.bin.clusterDims[2],
-            self.bin.shared,
-            self.stream,
-            self.bin.cu_function,
-            self.launch_enter_hook,
-            self.launch_exit_hook,
-            self.bin,
-            *self.bin.assemble_tensormap_to_arg(self.non_constexpr_arg_values),
-        )
+        # final BENCH（使用 runner，自动选择默认 CUDA stream）
+        _runner = self.bin[(self.grid_0, self.grid_1, self.grid_2)]
+        fn = lambda: _runner(*self.non_constexpr_arg_values)
         if assemble_ok:
             try:
                 # warmup = self.config['warmup']

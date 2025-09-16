@@ -50,3 +50,6 @@ torch_compile_debug/
 tmp/
 *egg-info
 cgo*/
+benchmarks/*bin
+runs/*
+CuAsmRL.pdf
